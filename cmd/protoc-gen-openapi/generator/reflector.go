@@ -194,7 +194,8 @@ func (r *OpenAPIv3Reflector) schemaOrReferenceForField(field protoreflect.FieldD
 
 	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Uint64Kind,
 		protoreflect.Sfixed64Kind, protoreflect.Fixed64Kind:
-		kindSchema = wk.NewStringSchema()
+		kindSchema = wk.NewIntegerSchema(kind.String())
+		//kindSchema = wk.NewStringSchema()
 
 	case protoreflect.EnumKind:
 		kindSchema = wk.NewEnumSchema(*&r.conf.EnumType, field)
