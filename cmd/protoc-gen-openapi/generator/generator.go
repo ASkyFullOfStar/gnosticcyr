@@ -252,15 +252,19 @@ func (g *OpenAPIv3Generator) filterCommentString(c protogen.Comments, removeNewL
 }
 
 //  extractMoretags compat gogoproto moretag annotations.
-func (g *OpenAPIv3Generator) hasDefaultIOrsRequired(field *protogen.Field) (*v3.DefaultType, string) {
-	var defaultValue *v3.DefaultType
-	var required string
+func (g *OpenAPIv3Generator) CompatGogoAnnotations(field *protogen.Field) (defaultValue *v3.DefaultType, required string, form string) {
 	gogoExtension := proto.GetExtension(field.Desc.Options(), gogo.E_Moretags)
 	if gogoExtension != nil {
 		if moreTags, err := structtag.Parse(gogoExtension.(string)); err == nil {
+			if tag, err := moreTags.Get("form"); err == nil {
+				form = tag.Name
+			}
 			if tag, err := moreTags.Get("validate"); err == nil {
 				if tag.HasOption("required") || tag.Name == ("required") {
 					required = g.reflect.formatFieldName(field.Desc)
+					if form != "" {
+						required = form
+					}
 				}
 			}
 			if tag, err := moreTags.Get("default"); err == nil {
@@ -280,8 +284,7 @@ func (g *OpenAPIv3Generator) hasDefaultIOrsRequired(field *protogen.Field) (*v3.
 			}
 		}
 	}
-
-	return defaultValue, required
+	return
 }
 
 func (g *OpenAPIv3Generator) findField(name string, inMessage *protogen.Message) *protogen.Field {
@@ -325,9 +328,12 @@ func (g *OpenAPIv3Generator) _buildQueryParamsV3(field *protogen.Field, depths m
 	queryFieldName := g.reflect.formatFieldName(field.Desc)
 	fieldDescription := g.filterCommentString(field.Comments.Leading, true)
 	required := false
-	defaultValue, require := g.hasDefaultIOrsRequired(field)
+	defaultValue, require, formName := g.CompatGogoAnnotations(field)
 	if require != "" {
 		required = true
+	}
+	if formName != "" {
+		queryFieldName = formName
 	}
 	if field.Desc.IsMap() {
 		// Map types are not allowed in query parameteres
@@ -821,11 +827,10 @@ func (g *OpenAPIv3Generator) addSchemasForMessagesToDocumentV3(d *v3.Document, m
 			inputOnly := false
 			outputOnly := false
 
-			defaultValue, require := g.hasDefaultIOrsRequired(field)
+			defaultValue, require, formName := g.CompatGogoAnnotations(field)
 			if require != "" {
 				required = append(required, require)
 			}
-
 			extension := proto.GetExtension(field.Desc.Options(), annotations.E_FieldBehavior)
 			if extension != nil {
 				switch v := extension.(type) {
@@ -870,11 +875,14 @@ func (g *OpenAPIv3Generator) addSchemasForMessagesToDocumentV3(d *v3.Document, m
 					proto.Merge(schema.Schema, extProperty.(*v3.Schema))
 				}
 			}
-
+			name := g.reflect.formatFieldName(field.Desc)
+			if formName != "" {
+				name = formName
+			}
 			definitionProperties.AdditionalProperties = append(
 				definitionProperties.AdditionalProperties,
 				&v3.NamedSchemaOrReference{
-					Name:  g.reflect.formatFieldName(field.Desc),
+					Name:  name,
 					Value: fieldSchema,
 				},
 			)
