@@ -251,6 +251,13 @@ func (g *OpenAPIv3Generator) filterCommentString(c protogen.Comments, removeNewL
 	return strings.TrimSpace(comment)
 }
 
+func hasGrpcOmit(comment string) (string, bool) {
+	if strings.Contains(comment, "grpcPath:\"omit\"") || strings.Contains(comment, "grpcPath: \"omit\"") {
+		return strings.Trim(comment, "grpcPath:\"omit\""), true
+	}
+	return comment, false
+}
+
 //  extractMoretags compat gogoproto moretag annotations.
 func (g *OpenAPIv3Generator) CompatGogoAnnotations(field *protogen.Field) (defaultValue *v3.DefaultType, required string, form string) {
 	gogoExtension := proto.GetExtension(field.Desc.Options(), gogo.E_Moretags)
@@ -696,20 +703,22 @@ func (g *OpenAPIv3Generator) addPathsToDocumentV3(d *v3.Document, services []*pr
 		annotationsCount := 0
 
 		for _, method := range service.Methods {
-			comment := g.filterCommentString(method.Comments.Leading, false)
 			inputMessage := method.Input
 			outputMessage := method.Output
 			operationID := service.GoName + "_" + method.GoName
 			defaultHost := proto.GetExtension(service.Desc.Options(), annotations.E_DefaultHost).(string)
-
-			// add post Operation for each grpc method
-			path := "/" + packageName + "." + service.GoName + "/" + method.GoName
-			op, path2 := g.buildOperationV3(d, operationID, []string{service.GoName, "GRPC"}, comment, defaultHost, path, "*", inputMessage, outputMessage)
-			extOperation := proto.GetExtension(method.Desc.Options(), v3.E_Operation)
-			if extOperation != nil {
-				proto.Merge(op, extOperation.(*v3.Operation))
+			comment := g.filterCommentString(method.Comments.Leading, false)
+			comment, ok := hasGrpcOmit(comment)
+			if !ok {
+				// add post Operation for each grpc method， if not contain grpcPath:"omit"
+				path := "/" + packageName + "." + service.GoName + "/" + method.GoName
+				op, path2 := g.buildOperationV3(d, operationID, []string{service.GoName, "GRPC"}, comment, defaultHost, path, "*", inputMessage, outputMessage)
+				extOperation := proto.GetExtension(method.Desc.Options(), v3.E_Operation)
+				if extOperation != nil {
+					proto.Merge(op, extOperation.(*v3.Operation))
+				}
+				g.addOperationToDocumentV3(d, op, path2, "POST")
 			}
-			g.addOperationToDocumentV3(d, op, path2, "POST")
 
 			// add http Operation for (google.api.http) annotations
 			rules := make([]*annotations.HttpRule, 0)
