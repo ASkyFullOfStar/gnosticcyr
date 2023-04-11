@@ -18,4 +18,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 )
 
-replace github.com/google/gnostic => github.com/ASkyFullOfStar/gnosticcyr v0.0.0-20221212111828-f7ab087b4633
+//replace github.com/google/gnostic => github.com/ASkyFullOfStar/gnosticcyr v0.0.0-20221212111828-f7ab087b4633
